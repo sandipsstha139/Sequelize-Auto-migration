@@ -1,40 +1,75 @@
 {
-  "users": {
-    "id": {
-      "type": "INTEGER",
-      "allowNull": false,
-      "defaultValue": null,
-      "primaryKey": true
-    },
-    "username": {
-      "type": "VARCHAR(255)",
-      "allowNull": false,
-      "defaultValue": null,
-      "primaryKey": false
-    },
-    "email": {
-      "type": "VARCHAR(255)",
-      "allowNull": false,
-      "defaultValue": null,
-      "primaryKey": false
-    },
-    "password": {
-      "type": "VARCHAR(255)",
-      "allowNull": true,
-      "defaultValue": null,
-      "primaryKey": false
-    },
-    "createdAt": {
-      "type": "TIMESTAMP WITH TIME ZONE",
-      "allowNull": false,
-      "defaultValue": null,
-      "primaryKey": false
-    },
-    "updatedAt": {
-      "type": "TIMESTAMP WITH TIME ZONE",
-      "allowNull": false,
-      "defaultValue": null,
-      "primaryKey": false
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "dbType": "INTEGER",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": true,
+          "unique": false
+        },
+        {
+          "name": "username",
+          "type": "string",
+          "dbType": "STRING",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "dbType": "STRING",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "dbType": "STRING",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "profileData",
+          "type": "json",
+          "dbType": "JSONB",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "createdAt",
+          "type": "dateTime",
+          "dbType": "DATE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "updatedAt",
+          "type": "dateTime",
+          "dbType": "DATE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [],
+      "foreignKeys": []
     }
-  }
+  ],
+  "enums": {}
 }

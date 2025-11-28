@@ -1,4 +1,5 @@
-import { Column, DataType, Model, Table } from "sequelize-typescript";
+import { Column, DataType, HasOne, Model, Table } from "sequelize-typescript";
+import Profile from "./profile.model";
 
 @Table({
   tableName: "users",
@@ -22,4 +23,24 @@ export default class User extends Model<User> {
     allowNull: true,
   })
   password?: string;
+
+  @HasOne(() => Profile)
+  profile!: Profile;
+
+  @Column({
+    type: DataType.JSONB,
+  })
+  metadata?: object;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: false,
+  })
+  createdAt!: Date;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: false,
+  })
+  updatedAt!: Date;
 }

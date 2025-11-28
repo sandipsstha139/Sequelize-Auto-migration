@@ -1,0 +1,43 @@
+export default {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.createTable("users", {
+      "id": {
+            "type": "INTEGER",
+            "allowNull": false,
+            "defaultValue": null,
+            "primaryKey": true
+      },
+      "username": {
+            "type": "VARCHAR(255)",
+            "allowNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+      },
+      "email": {
+            "type": "VARCHAR(255)",
+            "allowNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+      },
+      "password": {
+            "type": "VARCHAR(255)",
+            "allowNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+      },
+      "createdAt": {
+            "type": "TIMESTAMP WITH TIME ZONE",
+            "allowNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+      },
+      "updatedAt": {
+            "type": "TIMESTAMP WITH TIME ZONE",
+            "allowNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+      }
+});
+  },
+  async down() {}
+};

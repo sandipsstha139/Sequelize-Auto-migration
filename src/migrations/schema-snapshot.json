@@ -173,7 +173,7 @@
           "unique": true
         },
         {
-          "name": "fullName",
+          "name": "username",
           "type": "STRING",
           "dbType": "VARCHAR(255)",
           "allowNull": true,
@@ -213,6 +213,5 @@
       "foreignKeys": [],
       "uniques": []
     }
-  ],
-  "enums": {}
+  ]
 }

@@ -1,38 +1,46 @@
 import { Command } from "commander";
-import { execa } from "execa";
-import { diff } from "./diff";
-import { generate } from "./generator";
-import { introspect } from "./introspect";
-import { loadSnapshot, saveSnapshot } from "./state";
+import {
+  generateMigration,
+  preview,
+  rollbackLast,
+  runMigrations,
+} from "./migrate";
 
-const program = new Command();
+export async function runCli() {
+  const program = new Command();
 
-program.command("preview").action(async () => {
-  const before = loadSnapshot();
-  const after = await introspect();
-  const actions = diff(before, after);
-  console.log(actions);
-});
+  program
+    .name("migration")
+    .description("Sequelize auto-migration CLI")
+    .version("1.0.0");
 
-program.command("generate").action(async () => {
-  const before = loadSnapshot();
-  const after = await introspect();
-  const actions = diff(before, after);
-  const file = generate(actions);
-  if (file) {
-    saveSnapshot(after);
-    console.log("Generated:", file);
-  } else console.log("No changes");
-});
+  program
+    .command("preview")
+    .description("Preview schema diff without generating a migration file")
+    .action(async () => {
+      await preview();
+    });
 
-program.command("run").action(async () => {
-  await execa("npx", ["sequelize-cli", "db:migrate"], { stdio: "inherit" });
-});
+  program
+    .command("generate")
+    .description("Generate a migration file from schema diff")
+    .action(async () => {
+      await generateMigration();
+    });
 
-program.command("rollback").action(async () => {
-  await execa("npx", ["sequelize-cli", "db:migrate:undo"], {
-    stdio: "inherit",
-  });
-});
+  program
+    .command("run")
+    .description("Run all pending migrations")
+    .action(async () => {
+      await runMigrations();
+    });
 
-program.parse(process.argv);
+  program
+    .command("rollback")
+    .description("Rollback last migration")
+    .action(async () => {
+      await rollbackLast();
+    });
+
+  await program.parseAsync(process.argv);
+}

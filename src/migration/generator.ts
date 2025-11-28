@@ -3,29 +3,32 @@ import path from "path";
 import { MigrationAction } from "./schema-types";
 
 function mapType(dbType: string) {
-  const raw = dbType.toUpperCase();
+  const upper = dbType.toUpperCase();
 
-  if (raw.startsWith("ENUM(")) {
-    const values = raw
-      .replace("ENUM(", "")
-      .replace(")", "")
+  if (upper.startsWith("ENUM(")) {
+    const inner = dbType.slice(
+      dbType.indexOf("(") + 1,
+      dbType.lastIndexOf(")")
+    );
+    const values = inner
       .split(",")
-      .map((v) => v.trim().replace(/'/g, ""));
-
+      .map((v) => v.trim().replace(/^'+|'+$/g, ""));
     return `Sequelize.ENUM(${values.map((v) => `"${v}"`).join(", ")})`;
   }
 
-  if (raw.includes("TIMESTAMP") || raw.includes("DATE"))
+  if (upper.includes("TIMESTAMP") || upper.includes("DATE"))
     return "Sequelize.DATE";
-  if (raw.includes("UUID")) return "Sequelize.UUID";
-  if (raw.includes("BIGINT")) return "Sequelize.BIGINT";
-  if (raw.includes("INT")) return "Sequelize.INTEGER";
-  if (raw.includes("TEXT")) return "Sequelize.TEXT";
-  if (raw.includes("CHAR") || raw.includes("STRING")) return "Sequelize.STRING";
-  if (raw.includes("BOOLEAN")) return "Sequelize.BOOLEAN";
-  if (raw.includes("JSON")) return "Sequelize.JSON";
-  if (raw.includes("DECIMAL")) return "Sequelize.DECIMAL";
-  if (raw.includes("FLOAT") || raw.includes("REAL")) return "Sequelize.FLOAT";
+  if (upper.includes("UUID")) return "Sequelize.UUID";
+  if (upper.includes("BIGINT")) return "Sequelize.BIGINT";
+  if (upper.includes("INT")) return "Sequelize.INTEGER";
+  if (upper.includes("TEXT")) return "Sequelize.TEXT";
+  if (upper.includes("CHAR") || upper.includes("STRING"))
+    return "Sequelize.STRING";
+  if (upper.includes("BOOLEAN")) return "Sequelize.BOOLEAN";
+  if (upper.includes("JSON")) return "Sequelize.JSON";
+  if (upper.includes("DECIMAL")) return "Sequelize.DECIMAL";
+  if (upper.includes("FLOAT") || upper.includes("REAL"))
+    return "Sequelize.FLOAT";
 
   return "Sequelize.STRING";
 }
@@ -92,10 +95,16 @@ export function generate(actions: MigrationAction[]): string | null {
     }
 
     if (a.kind === "createIndex") {
+      const options: any = {
+        name: a.index.name,
+        unique: a.index.unique,
+      };
+      if (a.index.where) options.where = a.index.where;
+
       up.push(
         `await queryInterface.addIndex("${a.tableName}", ${JSON.stringify(
           a.index.columns
-        )}, { name: "${a.index.name}", unique: ${a.index.unique} });`
+        )}, ${JSON.stringify(options)});`
       );
       down.push(
         `await queryInterface.removeIndex("${a.tableName}", "${a.index.name}");`
@@ -133,10 +142,10 @@ export function generate(actions: MigrationAction[]): string | null {
 
     if (a.kind === "addUnique") {
       up.push(`await queryInterface.addConstraint("${a.tableName}", {
-    type: "unique",
-    name: "${a.unique.name}",
-    fields: ${JSON.stringify(a.unique.columns)}
-  });`);
+  type: "unique",
+  name: "${a.unique.name}",
+  fields: ${JSON.stringify(a.unique.columns)}
+});`);
       down.push(
         `await queryInterface.removeConstraint("${a.tableName}", "${a.unique.name}");`
       );
@@ -145,32 +154,6 @@ export function generate(actions: MigrationAction[]): string | null {
     if (a.kind === "dropUnique") {
       up.push(
         `await queryInterface.removeConstraint("${a.tableName}", "${a.uniqueName}");`
-      );
-    }
-
-    if (a.kind === "createEnum") {
-      up.push(`await queryInterface.sequelize.query(
-  'CREATE TYPE "${a.enum.name}" AS ENUM (${a.enum.values
-        .map((v) => `'${v}'`)
-        .join(", ")})'
-);`);
-      down.push(
-        `await queryInterface.sequelize.query('DROP TYPE "${a.enum.name}"');`
-      );
-    }
-
-    if (a.kind === "alterEnum") {
-      up.push(`await queryInterface.sequelize.query(
-  'ALTER TYPE "${a.after.name}" ADD VALUE IF NOT EXISTS ${a.after.values
-        .map((v) => `'${v}'`)
-        .join(", ")}'
-);`);
-      down.push(`-- manual rollback required for enum value removal`);
-    }
-
-    if (a.kind === "dropEnum") {
-      up.push(
-        `await queryInterface.sequelize.query('DROP TYPE IF EXISTS "${a.enumName}"');`
       );
     }
   });

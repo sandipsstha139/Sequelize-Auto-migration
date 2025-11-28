@@ -11,13 +11,15 @@ export function diff(
   const out: MigrationAction[] = [];
 
   after.tables.forEach((t) => {
-    if (!before.tables.find((x) => x.name === t.name))
+    if (!before.tables.find((x) => x.name === t.name)) {
       out.push({ kind: "createTable", table: t });
+    }
   });
 
   before.tables.forEach((t) => {
-    if (!after.tables.find((x) => x.name === t.name))
+    if (!after.tables.find((x) => x.name === t.name)) {
       out.push({ kind: "dropTable", tableName: t.name });
+    }
   });
 
   after.tables.forEach((t) => {
@@ -27,18 +29,20 @@ export function diff(
     t.columns.forEach((c) => {
       const p = prev.columns.find((x) => x.name === c.name);
       if (!p) out.push({ kind: "addColumn", tableName: t.name, column: c });
-      else if (!same(p, c))
+      else if (!same(p, c)) {
         out.push({
           kind: "alterColumn",
           tableName: t.name,
           before: p,
           after: c,
         });
+      }
     });
 
     prev.columns.forEach((c) => {
-      if (!t.columns.find((x) => x.name === c.name))
+      if (!t.columns.find((x) => x.name === c.name)) {
         out.push({ kind: "dropColumn", tableName: t.name, columnName: c.name });
+      }
     });
 
     t.indexes.forEach((i) => {
@@ -51,8 +55,9 @@ export function diff(
     });
 
     prev.indexes.forEach((i) => {
-      if (!t.indexes.find((x) => x.name === i.name))
+      if (!t.indexes.find((x) => x.name === i.name)) {
         out.push({ kind: "dropIndex", tableName: t.name, indexName: i.name });
+      }
     });
 
     t.foreignKeys.forEach((fk) => {
@@ -65,8 +70,9 @@ export function diff(
     });
 
     prev.foreignKeys.forEach((fk) => {
-      if (!t.foreignKeys.find((x) => x.name === fk.name))
+      if (!t.foreignKeys.find((x) => x.name === fk.name)) {
         out.push({ kind: "dropFK", tableName: t.name, fkName: fk.name });
+      }
     });
 
     const beforeUnique = prev.uniques || [];
@@ -86,24 +92,10 @@ export function diff(
     });
 
     beforeUnique.forEach((u) => {
-      if (!afterUnique.find((x) => x.name === u.name))
+      if (!afterUnique.find((x) => x.name === u.name)) {
         out.push({ kind: "dropUnique", tableName: t.name, uniqueName: u.name });
+      }
     });
-  });
-
-  Object.entries(after.enums).forEach(([name, values]) => {
-    const beforeVals = before.enums[name];
-    if (!beforeVals) out.push({ kind: "createEnum", enum: { name, values } });
-    else if (!same(beforeVals, values))
-      out.push({
-        kind: "alterEnum",
-        before: { name, values: beforeVals },
-        after: { name, values },
-      });
-  });
-
-  Object.keys(before.enums).forEach((name) => {
-    if (!after.enums[name]) out.push({ kind: "dropEnum", enumName: name });
   });
 
   return out;

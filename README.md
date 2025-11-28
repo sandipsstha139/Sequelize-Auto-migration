@@ -68,14 +68,15 @@ Generated migrations are compatible with `sequelize-cli`, ensuring reliable exec
 
 ## Limitations
 
-This system does not handle the following:
+This system is designed for PostgreSQL only and relies on Sequelize metadata.
+The following limitations apply:
 
-- Removing ENUM values (Postgres limitation)
-- Automatically detecting many-to-many relations without a defined through model
-- Check constraints or exclusion constraints (not included in Sequelize metadata)
-- Partial indexes
-- Evolving composite primary keys
-- Database-specific advanced features beyond Sequelize metadata
+- Removing ENUM values is not performed automatically (PostgreSQL restriction)
+- ENUM type restructuring (such as reordering values) requires manual editing
+- Many-to-many relationships without an explicit through model are not automatically detected
+- Check constraints and exclusion constraints are not extracted because Sequelize does not expose them in model metadata
+- Advanced PostgreSQL features outside Sequelize’s metadata (such as triggers, rules, partitioning) are not included
+- Complex changes to composite primary keys may require manual review
 
 ---
 

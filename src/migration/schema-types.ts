@@ -25,6 +25,7 @@ export type IndexSchema = {
   name: string;
   columns: string[];
   unique: boolean;
+  where?: any | null;
 };
 
 export type ForeignKeySchema = {
@@ -41,11 +42,6 @@ export type UniqueConstraintSchema = {
   columns: string[];
 };
 
-export type EnumSchema = {
-  name: string;
-  values: string[];
-};
-
 export type TableSchema = {
   name: string;
   columns: ColumnSchema[];
@@ -56,7 +52,6 @@ export type TableSchema = {
 
 export type DatabaseSchema = {
   tables: TableSchema[];
-  enums: Record<string, string[]>;
 };
 
 export type MigrationAction =
@@ -75,7 +70,4 @@ export type MigrationAction =
   | { kind: "addFK"; tableName: string; fk: ForeignKeySchema }
   | { kind: "dropFK"; tableName: string; fkName: string }
   | { kind: "addUnique"; tableName: string; unique: UniqueConstraintSchema }
-  | { kind: "dropUnique"; tableName: string; uniqueName: string }
-  | { kind: "createEnum"; enum: EnumSchema }
-  | { kind: "alterEnum"; before: EnumSchema; after: EnumSchema }
-  | { kind: "dropEnum"; enumName: string };
+  | { kind: "dropUnique"; tableName: string; uniqueName: string };

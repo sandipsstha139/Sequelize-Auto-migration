@@ -1,2 +1,4 @@
 #!/usr/bin/env ts-node
-import "../../src/migration/cli";
+import { runCli } from "../migration/cli";
+
+runCli();

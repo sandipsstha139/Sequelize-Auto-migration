@@ -30,7 +30,7 @@ function toScalar(db: string): any {
 export async function introspect(): Promise<DatabaseSchema> {
   await sequelize.authenticate();
 
-  const schema: DatabaseSchema = { tables: [], enums: {} };
+  const schema: DatabaseSchema = { tables: [] };
   const models = sequelize.modelManager.models as ModelCtor<Model>[];
 
   for (const m of models) {
@@ -39,13 +39,13 @@ export async function introspect(): Promise<DatabaseSchema> {
 
     const columns: ColumnSchema[] = Object.entries(attrs).map(
       ([name, a]: any) => {
-        const raw = a.type?.toString()?.toUpperCase() || "STRING";
-        const mapped = toScalar(raw);
+        const rawType = a.type?.toString() || "STRING";
+        const scalar = toScalar(rawType);
 
         return {
           name,
-          type: mapped,
-          dbType: raw,
+          type: scalar,
+          dbType: rawType,
           allowNull: a.allowNull ?? true,
           defaultValue: a.defaultValue ?? null,
           primaryKey: !!a.primaryKey,
@@ -59,6 +59,7 @@ export async function introspect(): Promise<DatabaseSchema> {
         name: idx.name,
         columns: idx.fields,
         unique: !!idx.unique,
+        where: idx.where || null,
       })) || [];
 
     const foreignKeys: ForeignKeySchema[] = [];
@@ -89,21 +90,6 @@ export async function introspect(): Promise<DatabaseSchema> {
         });
       });
     }
-
-    const tableEnums: Record<string, string[]> = {};
-    columns.forEach((c) => {
-      if (c.dbType.startsWith("ENUM(")) {
-        const enumName = `${tableName}_${c.name}_enum`;
-        const vals = c.dbType
-          .replace("ENUM(", "")
-          .replace(")", "")
-          .split(",")
-          .map((v) => v.trim().replace(/'/g, ""));
-        tableEnums[enumName] = vals;
-      }
-    });
-
-    schema.enums = { ...schema.enums, ...tableEnums };
 
     schema.tables.push({
       name: tableName,

@@ -1,48 +1,48 @@
 {
   "tables": [
     {
-      "name": "users",
+      "name": "posts",
       "columns": [
         {
           "name": "id",
-          "type": "integer",
+          "type": "INTEGER",
           "dbType": "INTEGER",
-          "allowNull": false,
+          "allowNull": true,
           "defaultValue": null,
           "primaryKey": true,
           "unique": false
         },
         {
-          "name": "username",
-          "type": "string",
-          "dbType": "STRING",
-          "allowNull": false,
-          "defaultValue": null,
-          "primaryKey": false,
-          "unique": false
-        },
-        {
-          "name": "email",
-          "type": "string",
-          "dbType": "STRING",
-          "allowNull": false,
-          "defaultValue": null,
-          "primaryKey": false,
-          "unique": false
-        },
-        {
-          "name": "password",
-          "type": "string",
-          "dbType": "STRING",
+          "name": "title",
+          "type": "STRING",
+          "dbType": "VARCHAR(255)",
           "allowNull": true,
           "defaultValue": null,
           "primaryKey": false,
           "unique": false
         },
         {
-          "name": "profileData",
-          "type": "json",
-          "dbType": "JSONB",
+          "name": "content",
+          "type": "TEXT",
+          "dbType": "TEXT",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "dbType": "ENUM",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "userId",
+          "type": "INTEGER",
+          "dbType": "INTEGER",
           "allowNull": true,
           "defaultValue": null,
           "primaryKey": false,
@@ -50,8 +50,8 @@
         },
         {
           "name": "createdAt",
-          "type": "dateTime",
-          "dbType": "DATE",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
           "allowNull": false,
           "defaultValue": null,
           "primaryKey": false,
@@ -59,8 +59,8 @@
         },
         {
           "name": "updatedAt",
-          "type": "dateTime",
-          "dbType": "DATE",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
           "allowNull": false,
           "defaultValue": null,
           "primaryKey": false,
@@ -68,7 +68,150 @@
         }
       ],
       "indexes": [],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "posts_userId_fkey",
+          "column": "userId",
+          "referencedTable": "users",
+          "referencedColumn": "id",
+          "onDelete": "NO ACTION",
+          "onUpdate": "CASCADE"
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "dbType": "INTEGER",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": true,
+          "unique": false
+        },
+        {
+          "name": "userId",
+          "type": "INTEGER",
+          "dbType": "INTEGER",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "avatarUrl",
+          "type": "STRING",
+          "dbType": "VARCHAR(255)",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "birthday",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [],
+      "foreignKeys": [
+        {
+          "name": "profiles_userId_fkey",
+          "column": "userId",
+          "referencedTable": "users",
+          "referencedColumn": "id",
+          "onDelete": "NO ACTION",
+          "onUpdate": "CASCADE"
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "dbType": "INTEGER",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": true,
+          "unique": false
+        },
+        {
+          "name": "email",
+          "type": "STRING",
+          "dbType": "VARCHAR(255)",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": true
+        },
+        {
+          "name": "fullName",
+          "type": "STRING",
+          "dbType": "VARCHAR(255)",
+          "allowNull": true,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "dbType": "ENUM",
+          "allowNull": false,
+          "defaultValue": "active",
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "createdAt",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATE",
+          "dbType": "TIMESTAMP WITH TIME ZONE",
+          "allowNull": false,
+          "defaultValue": null,
+          "primaryKey": false,
+          "unique": false
+        }
+      ],
+      "indexes": [],
+      "foreignKeys": [],
+      "uniques": []
     }
   ],
   "enums": {}

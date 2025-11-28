@@ -1,21 +1,20 @@
 export type ScalarType =
-  | "string"
-  | "text"
-  | "integer"
-  | "bigint"
-  | "boolean"
-  | "date"
-  | "dateTime"
-  | "float"
-  | "decimal"
-  | "json"
-  | "uuid"
-  | "enum";
+  | "STRING"
+  | "TEXT"
+  | "INTEGER"
+  | "BIGINT"
+  | "BOOLEAN"
+  | "DATE"
+  | "FLOAT"
+  | "DECIMAL"
+  | "JSON"
+  | "UUID"
+  | "ENUM";
 
 export type ColumnSchema = {
   name: string;
   type: ScalarType;
-  dbType: string;         // raw DB type, e.g. "VARCHAR(255)" or "ENUM('A','B')"
+  dbType: string;
   allowNull: boolean;
   defaultValue: any;
   primaryKey: boolean;
@@ -33,8 +32,18 @@ export type ForeignKeySchema = {
   column: string;
   referencedTable: string;
   referencedColumn: string;
-  onUpdate?: string | null;
-  onDelete?: string | null;
+  onUpdate: string | null;
+  onDelete: string | null;
+};
+
+export type UniqueConstraintSchema = {
+  name: string;
+  columns: string[];
+};
+
+export type EnumSchema = {
+  name: string;
+  values: string[];
 };
 
 export type TableSchema = {
@@ -42,67 +51,31 @@ export type TableSchema = {
   columns: ColumnSchema[];
   indexes: IndexSchema[];
   foreignKeys: ForeignKeySchema[];
+  uniques: UniqueConstraintSchema[];
 };
 
 export type DatabaseSchema = {
   tables: TableSchema[];
-  enums: {
-    // key: enum name, value: allowed values
-    [name: string]: string[];
-  };
+  enums: Record<string, string[]>;
 };
 
 export type MigrationAction =
   | { kind: "createTable"; table: TableSchema }
   | { kind: "dropTable"; tableName: string }
-  | {
-      kind: "addColumn";
-      tableName: string;
-      column: ColumnSchema;
-    }
-  | {
-      kind: "dropColumn";
-      tableName: string;
-      columnName: string;
-    }
+  | { kind: "addColumn"; tableName: string; column: ColumnSchema }
+  | { kind: "dropColumn"; tableName: string; columnName: string }
   | {
       kind: "alterColumn";
       tableName: string;
       before: ColumnSchema;
       after: ColumnSchema;
     }
-  | {
-      kind: "createIndex";
-      tableName: string;
-      index: IndexSchema;
-    }
-  | {
-      kind: "dropIndex";
-      tableName: string;
-      indexName: string;
-    }
-  | {
-      kind: "addForeignKey";
-      tableName: string;
-      fk: ForeignKeySchema;
-    }
-  | {
-      kind: "dropForeignKey";
-      tableName: string;
-      fkName: string;
-    }
-  | {
-      kind: "createEnum";
-      name: string;
-      values: string[];
-    }
-  | {
-      kind: "alterEnum";
-      name: string;
-      before: string[];
-      after: string[];
-    }
-  | {
-      kind: "dropEnum";
-      name: string;
-    };
+  | { kind: "createIndex"; tableName: string; index: IndexSchema }
+  | { kind: "dropIndex"; tableName: string; indexName: string }
+  | { kind: "addFK"; tableName: string; fk: ForeignKeySchema }
+  | { kind: "dropFK"; tableName: string; fkName: string }
+  | { kind: "addUnique"; tableName: string; unique: UniqueConstraintSchema }
+  | { kind: "dropUnique"; tableName: string; uniqueName: string }
+  | { kind: "createEnum"; enum: EnumSchema }
+  | { kind: "alterEnum"; before: EnumSchema; after: EnumSchema }
+  | { kind: "dropEnum"; enumName: string };

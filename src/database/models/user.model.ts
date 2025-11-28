@@ -1,46 +1,34 @@
-import { Column, DataType, HasOne, Model, Table } from "sequelize-typescript";
-import Profile from "./profile.model";
+import {
+  AutoIncrement,
+  Column,
+  DataType,
+  Model,
+  PrimaryKey,
+  Table,
+  Unique,
+} from "sequelize-typescript";
 
 @Table({
   tableName: "users",
   timestamps: true,
 })
 export default class User extends Model<User> {
-  @Column({
-    type: DataType.STRING,
-    allowNull: false,
-  })
+  @PrimaryKey
+  @AutoIncrement
+  @Column
+  id!: number;
+
+  @Unique
+  @Column(DataType.STRING)
+  email!: string;
+
+  @Column(DataType.STRING)
   username!: string;
 
   @Column({
-    type: DataType.STRING,
+    type: DataType.ENUM("active", "disabled"),
     allowNull: false,
+    defaultValue: "active",
   })
-  email!: string;
-
-  @Column({
-    type: DataType.STRING,
-    allowNull: true,
-  })
-  password?: string;
-
-  @HasOne(() => Profile)
-  profile!: Profile;
-
-  @Column({
-    type: DataType.JSONB,
-  })
-  metadata?: object;
-
-  @Column({
-    type: DataType.DATE,
-    allowNull: false,
-  })
-  createdAt!: Date;
-
-  @Column({
-    type: DataType.DATE,
-    allowNull: false,
-  })
-  updatedAt!: Date;
+  status!: "active" | "disabled";
 }

@@ -1,262 +1,193 @@
 import fs from "fs";
 import path from "path";
-import { ColumnSchema, MigrationAction } from "./schema-types";
+import { MigrationAction } from "./schema-types";
 
-function columnToSequelizeDef(col: ColumnSchema): string {
-  const base: any = {
-    type: `Sequelize.${col.dbType}`, // you can refine or map manually if needed
-    allowNull: col.allowNull,
-  };
+function mapType(dbType: string) {
+  const raw = dbType.toUpperCase();
 
-  if (col.defaultValue !== null && col.defaultValue !== undefined) {
-    base.defaultValue = col.defaultValue;
+  if (raw.startsWith("ENUM(")) {
+    const values = raw
+      .replace("ENUM(", "")
+      .replace(")", "")
+      .split(",")
+      .map((v) => v.trim().replace(/'/g, ""));
+
+    return `Sequelize.ENUM(${values.map((v) => `"${v}"`).join(", ")})`;
   }
-  if (col.primaryKey) base.primaryKey = true;
-  if (col.unique) base.unique = true;
 
-  // JSON.stringify but keep type as expression
-  const json = JSON.stringify(base, null, 2).replace(
-    /"Sequelize\.(.+)"/g,
-    "Sequelize.$1"
-  );
+  if (raw.includes("TIMESTAMP") || raw.includes("DATE"))
+    return "Sequelize.DATE";
+  if (raw.includes("UUID")) return "Sequelize.UUID";
+  if (raw.includes("BIGINT")) return "Sequelize.BIGINT";
+  if (raw.includes("INT")) return "Sequelize.INTEGER";
+  if (raw.includes("TEXT")) return "Sequelize.TEXT";
+  if (raw.includes("CHAR") || raw.includes("STRING")) return "Sequelize.STRING";
+  if (raw.includes("BOOLEAN")) return "Sequelize.BOOLEAN";
+  if (raw.includes("JSON")) return "Sequelize.JSON";
+  if (raw.includes("DECIMAL")) return "Sequelize.DECIMAL";
+  if (raw.includes("FLOAT") || raw.includes("REAL")) return "Sequelize.FLOAT";
 
-  return json;
+  return "Sequelize.STRING";
 }
 
-function generateUp(actions: MigrationAction[]): string[] {
-  const lines: string[] = [];
-
-  for (const a of actions) {
-    switch (a.kind) {
-      case "createEnum":
-        // For Postgres, you might create type manually, but Sequelize does not have direct API.
-        lines.push(
-          `    // NOTE: createEnum '${a.name}' manually if needed, or rely on column type`
-        );
-        break;
-
-      case "alterEnum":
-        lines.push(
-          `    // NOTE: alterEnum '${
-            a.name
-          }' manually. Before: ${JSON.stringify(
-            a.before
-          )}, After: ${JSON.stringify(a.after)}`
-        );
-        break;
-
-      case "dropEnum":
-        lines.push(`    // NOTE: dropEnum '${a.name}' manually if needed`);
-        break;
-
-      case "createTable": {
-        const cols: string[] = [];
-        a.table.columns.forEach((col) => {
-          cols.push(
-            `      ${JSON.stringify(col.name)}: ${columnToSequelizeDef(col)}`
-          );
-        });
-        lines.push(
-          `    await queryInterface.createTable(${JSON.stringify(
-            a.table.name
-          )}, {\n${cols.join(",\n")}\n    });`
-        );
-        break;
-      }
-
-      case "dropTable":
-        lines.push(
-          `    await queryInterface.dropTable(${JSON.stringify(a.tableName)});`
-        );
-        break;
-
-      case "addColumn":
-        lines.push(
-          `    await queryInterface.addColumn(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.column.name)}, ${columnToSequelizeDef(
-            a.column
-          )});`
-        );
-        break;
-
-      case "dropColumn":
-        lines.push(
-          `    await queryInterface.removeColumn(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.columnName)});`
-        );
-        break;
-
-      case "alterColumn":
-        lines.push(
-          `    await queryInterface.changeColumn(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.after.name)}, ${columnToSequelizeDef(
-            a.after
-          )});`
-        );
-        break;
-
-      case "createIndex":
-        lines.push(
-          `    await queryInterface.addIndex(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.index.columns)}, { name: ${JSON.stringify(
-            a.index.name
-          )}, unique: ${a.index.unique} });`
-        );
-        break;
-
-      case "dropIndex":
-        lines.push(
-          `    await queryInterface.removeIndex(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.indexName)});`
-        );
-        break;
-
-      case "addForeignKey":
-        lines.push(
-          `    await queryInterface.addConstraint(${JSON.stringify(
-            a.tableName
-          )}, {\n` +
-            `      type: 'foreign key',\n` +
-            `      name: ${JSON.stringify(a.fk.name)},\n` +
-            `      fields: [${JSON.stringify(a.fk.column)}],\n` +
-            `      references: {\n` +
-            `        table: ${JSON.stringify(a.fk.referencedTable)},\n` +
-            `        field: ${JSON.stringify(a.fk.referencedColumn)},\n` +
-            `      },\n` +
-            (a.fk.onDelete
-              ? `      onDelete: ${JSON.stringify(a.fk.onDelete)},\n`
-              : "") +
-            (a.fk.onUpdate
-              ? `      onUpdate: ${JSON.stringify(a.fk.onUpdate)},\n`
-              : "") +
-            `    });`
-        );
-        break;
-
-      case "dropForeignKey":
-        lines.push(
-          `    await queryInterface.removeConstraint(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.fkName)});`
-        );
-        break;
+function col(c: any) {
+  return `{
+    type: ${mapType(c.dbType)},
+    allowNull: ${c.allowNull},
+    primaryKey: ${c.primaryKey},
+    unique: ${c.unique},
+    defaultValue: ${
+      c.defaultValue === null ? "null" : JSON.stringify(c.defaultValue)
     }
-  }
-
-  return lines;
+  }`;
 }
 
-function generateDown(actions: MigrationAction[]): string[] {
-  // reverse the actions
-  const reversed = [...actions].reverse();
-  const lines: string[] = [];
-
-  for (const a of reversed) {
-    switch (a.kind) {
-      case "createTable":
-        lines.push(
-          `    await queryInterface.dropTable(${JSON.stringify(a.table.name)});`
-        );
-        break;
-      case "dropTable":
-        lines.push(
-          `    // down for dropTable: re-create table '${a.tableName}' manually if needed`
-        );
-        break;
-      case "addColumn":
-        lines.push(
-          `    await queryInterface.removeColumn(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.column.name)});`
-        );
-        break;
-      case "dropColumn":
-        lines.push(
-          `    // down for dropColumn '${a.columnName}' on '${a.tableName}' not auto generated`
-        );
-        break;
-      case "alterColumn":
-        lines.push(
-          `    await queryInterface.changeColumn(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.before.name)}, ${columnToSequelizeDef(
-            a.before
-          )});`
-        );
-        break;
-      case "createIndex":
-        lines.push(
-          `    await queryInterface.removeIndex(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.index.name)});`
-        );
-        break;
-      case "dropIndex":
-        lines.push(
-          `    // down for dropIndex '${a.indexName}' not auto generated`
-        );
-        break;
-      case "addForeignKey":
-        lines.push(
-          `    await queryInterface.removeConstraint(${JSON.stringify(
-            a.tableName
-          )}, ${JSON.stringify(a.fk.name)});`
-        );
-        break;
-      case "dropForeignKey":
-        lines.push(
-          `    // down for dropForeignKey '${a.fkName}' not auto generated`
-        );
-        break;
-      case "createEnum":
-      case "alterEnum":
-      case "dropEnum":
-        lines.push(
-          `    // down for enum '${(a as any).name}' not auto generated`
-        );
-        break;
-    }
-  }
-
-  return lines;
-}
-
-export function generateMigrationFile(
-  actions: MigrationAction[]
-): string | null {
+export function generate(actions: MigrationAction[]): string | null {
   if (!actions.length) return null;
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const fileName = `${timestamp}-auto-migration.ts`;
-  const migrationsDir = path.join(process.cwd(), "src/migrations");
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const name = `${ts}-auto-migration.js`;
+  const dir = path.join(process.cwd(), "src/migrations");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  if (!fs.existsSync(migrationsDir)) {
-    fs.mkdirSync(migrationsDir, { recursive: true });
-  }
+  const up: string[] = [];
+  const down: string[] = [];
 
-  const upLines = generateUp(actions);
-  const downLines = generateDown(actions);
+  actions.forEach((a) => {
+    if (a.kind === "createTable") {
+      const columns = a.table.columns
+        .map((c) => `"${c.name}": ${col(c)}`)
+        .join(",\n      ");
+
+      up.push(`await queryInterface.createTable("${a.table.name}", {
+      ${columns}
+    });`);
+
+      down.push(`await queryInterface.dropTable("${a.table.name}");`);
+    }
+
+    if (a.kind === "addColumn") {
+      up.push(
+        `await queryInterface.addColumn("${a.tableName}", "${
+          a.column.name
+        }", ${col(a.column)});`
+      );
+      down.push(
+        `await queryInterface.removeColumn("${a.tableName}", "${a.column.name}");`
+      );
+    }
+
+    if (a.kind === "dropColumn") {
+      up.push(
+        `await queryInterface.removeColumn("${a.tableName}", "${a.columnName}");`
+      );
+    }
+
+    if (a.kind === "alterColumn") {
+      up.push(
+        `await queryInterface.changeColumn("${a.tableName}", "${
+          a.after.name
+        }", ${col(a.after)});`
+      );
+    }
+
+    if (a.kind === "createIndex") {
+      up.push(
+        `await queryInterface.addIndex("${a.tableName}", ${JSON.stringify(
+          a.index.columns
+        )}, { name: "${a.index.name}", unique: ${a.index.unique} });`
+      );
+      down.push(
+        `await queryInterface.removeIndex("${a.tableName}", "${a.index.name}");`
+      );
+    }
+
+    if (a.kind === "dropIndex") {
+      up.push(
+        `await queryInterface.removeIndex("${a.tableName}", "${a.indexName}");`
+      );
+    }
+
+    if (a.kind === "addFK") {
+      up.push(`await queryInterface.addConstraint("${a.tableName}", {
+  type: "foreign key",
+  fields: ["${a.fk.column}"],
+  name: "${a.fk.name}",
+  references: { table: "${a.fk.referencedTable}", field: "${
+        a.fk.referencedColumn
+      }" },
+  onDelete: ${a.fk.onDelete ? `"${a.fk.onDelete}"` : "null"},
+  onUpdate: ${a.fk.onUpdate ? `"${a.fk.onUpdate}"` : "null"}
+});`);
+
+      down.push(
+        `await queryInterface.removeConstraint("${a.tableName}", "${a.fk.name}");`
+      );
+    }
+
+    if (a.kind === "dropFK") {
+      up.push(
+        `await queryInterface.removeConstraint("${a.tableName}", "${a.fkName}");`
+      );
+    }
+
+    if (a.kind === "addUnique") {
+      up.push(`await queryInterface.addConstraint("${a.tableName}", {
+    type: "unique",
+    name: "${a.unique.name}",
+    fields: ${JSON.stringify(a.unique.columns)}
+  });`);
+      down.push(
+        `await queryInterface.removeConstraint("${a.tableName}", "${a.unique.name}");`
+      );
+    }
+
+    if (a.kind === "dropUnique") {
+      up.push(
+        `await queryInterface.removeConstraint("${a.tableName}", "${a.uniqueName}");`
+      );
+    }
+
+    if (a.kind === "createEnum") {
+      up.push(`await queryInterface.sequelize.query(
+  'CREATE TYPE "${a.enum.name}" AS ENUM (${a.enum.values
+        .map((v) => `'${v}'`)
+        .join(", ")})'
+);`);
+      down.push(
+        `await queryInterface.sequelize.query('DROP TYPE "${a.enum.name}"');`
+      );
+    }
+
+    if (a.kind === "alterEnum") {
+      up.push(`await queryInterface.sequelize.query(
+  'ALTER TYPE "${a.after.name}" ADD VALUE IF NOT EXISTS ${a.after.values
+        .map((v) => `'${v}'`)
+        .join(", ")}'
+);`);
+      down.push(`-- manual rollback required for enum value removal`);
+    }
+
+    if (a.kind === "dropEnum") {
+      up.push(
+        `await queryInterface.sequelize.query('DROP TYPE IF EXISTS "${a.enumName}"');`
+      );
+    }
+  });
 
   const content = `
-import { QueryInterface, Sequelize } from "sequelize";
-
-export default {
-  async up(queryInterface: QueryInterface, Sequelize: typeof import("sequelize")) {
-${upLines.join("\n")}
+"use strict";
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    ${up.join("\n    ")}
   },
-
-  async down(queryInterface: QueryInterface, Sequelize: typeof import("sequelize")) {
-${downLines.join("\n")}
+  async down(queryInterface, Sequelize) {
+    ${down.join("\n    ")}
   },
 };
-`.trimStart();
+`;
 
-  const filePath = path.join(migrationsDir, fileName);
-  fs.writeFileSync(filePath, content, "utf8");
-  return filePath;
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, content);
+  return file;
 }

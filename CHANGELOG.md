@@ -1,5 +1,11 @@
 # seqmig
 
+## 1.1.1
+
+### Patch Changes
+
+- Updated Readme.md
+
 ## 1.1.0
 
 ### Minor Changes

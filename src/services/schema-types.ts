@@ -8,17 +8,22 @@ export type ScalarType =
   | "FLOAT"
   | "DECIMAL"
   | "JSON"
+  | "JSONB"
   | "UUID"
-  | "ENUM";
+  | "ENUM"
+  | "ARRAY";
 
 export type ColumnSchema = {
   name: string;
   type: ScalarType;
   dbType: string;
   allowNull: boolean;
-  defaultValue: any;
+  defaultValue?: any;
   primaryKey: boolean;
   unique: boolean;
+  autoIncrement: boolean;
+  comment?: string | null;
+  enumValues?: string[];
 };
 
 export type IndexSchema = {
@@ -26,6 +31,8 @@ export type IndexSchema = {
   columns: string[];
   unique: boolean;
   where?: any | null;
+  type?: string | null;
+  using?: string | null;
 };
 
 export type ForeignKeySchema = {
@@ -42,12 +49,19 @@ export type UniqueConstraintSchema = {
   columns: string[];
 };
 
+export type CheckConstraintSchema = {
+  name: string;
+  expression: string;
+};
+
 export type TableSchema = {
   name: string;
   columns: ColumnSchema[];
   indexes: IndexSchema[];
   foreignKeys: ForeignKeySchema[];
   uniques: UniqueConstraintSchema[];
+  checks: CheckConstraintSchema[];
+  primaryKeys: string[];
 };
 
 export type DatabaseSchema = {
@@ -56,9 +70,20 @@ export type DatabaseSchema = {
 
 export type MigrationAction =
   | { kind: "createTable"; table: TableSchema }
-  | { kind: "dropTable"; tableName: string }
+  | { kind: "dropTable"; tableName: string; backup: TableSchema }
   | { kind: "addColumn"; tableName: string; column: ColumnSchema }
-  | { kind: "dropColumn"; tableName: string; columnName: string }
+  | {
+      kind: "dropColumn";
+      tableName: string;
+      columnName: string;
+      backup: ColumnSchema;
+    }
+  | {
+      kind: "renameColumn";
+      tableName: string;
+      oldName: string;
+      newName: string;
+    }
   | {
       kind: "alterColumn";
       tableName: string;
@@ -66,8 +91,36 @@ export type MigrationAction =
       after: ColumnSchema;
     }
   | { kind: "createIndex"; tableName: string; index: IndexSchema }
-  | { kind: "dropIndex"; tableName: string; indexName: string }
+  | {
+      kind: "dropIndex";
+      tableName: string;
+      indexName: string;
+      backup: IndexSchema;
+    }
   | { kind: "addFK"; tableName: string; fk: ForeignKeySchema }
-  | { kind: "dropFK"; tableName: string; fkName: string }
+  | {
+      kind: "dropFK";
+      tableName: string;
+      fkName: string;
+      backup: ForeignKeySchema;
+    }
   | { kind: "addUnique"; tableName: string; unique: UniqueConstraintSchema }
-  | { kind: "dropUnique"; tableName: string; uniqueName: string };
+  | {
+      kind: "dropUnique";
+      tableName: string;
+      uniqueName: string;
+      backup: UniqueConstraintSchema;
+    }
+  | { kind: "addCheck"; tableName: string; check: CheckConstraintSchema }
+  | {
+      kind: "dropCheck";
+      tableName: string;
+      checkName: string;
+      backup: CheckConstraintSchema;
+    }
+  | {
+      kind: "changePrimaryKey";
+      tableName: string;
+      before: string[];
+      after: string[];
+    };

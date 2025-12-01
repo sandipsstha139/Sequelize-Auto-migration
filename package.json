@@ -1,31 +1,41 @@
 {
-  "name": "sequelize-test",
+  "name": "seqmig",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "migration:preview": "ts-node src/tools/migrate.ts preview",
-    "migration:generate": "ts-node src/tools/migrate.ts generate",
-    "migration:run": "ts-node src/tools/migrate.ts run",
-    "migration:rollback": "ts-node src/tools/migrate.ts rollback"
+  "description": "Sequelize auto-migration CLI",
+  "main": "dist/index.js",
+  "bin": {
+    "seqmig": "dist/index.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "build": "tsup",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "changeset": "changeset"
+  },
+  "keywords": [
+    "sequelize",
+    "migration",
+    "auto-migration",
+    "cli",
+    "database"
+  ],
+  "author": "Sandip Shrestha <sandipstha139@gmail.com>",
   "license": "ISC",
   "packageManager": "pnpm@10.14.0",
   "dependencies": {
+    "commander": "^14.0.2",
+    "execa": "^9.6.1",
     "pg": "^8.16.3",
-    "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.3",
-    "sequelize-typescript": "^2.1.6"
+    "sequelize-typescript": "^2.1.6",
+    "tsx": "^4.21.0",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@types/node": "^24.10.1",
-    "commander": "^14.0.2",
-    "execa": "^9.6.0",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   }
 }

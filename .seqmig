@@ -1,0 +1,7 @@
+{
+  "config": "src/config",
+  "migrationDir": "src/migrations",
+  "snapshotDir": "src/migrations/snapshots",
+  "dialect": "postgres",
+  "useSequelizeCli": true
+}

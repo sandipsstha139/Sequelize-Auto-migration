@@ -14,125 +14,92 @@ import { Command } from "commander";
 // package.json
 var version = "1.0.0";
 
-// src/services/introspect.ts
-import { Sequelize } from "sequelize-typescript";
-
-// src/utils/load-config.ts
-import { spawnSync } from "child_process";
-import fs2 from "fs";
-import path2 from "path";
-
-// src/utils/load-seqmig.ts
+// src/loaders/config-loader.ts
 import fs from "fs";
 import path from "path";
-import YAML from "yaml";
-var possibleFiles = [
-  ".seqmig",
-  ".seqmig.json",
-  ".seqmig.yaml",
-  ".seqmig.yml",
-  ".seqmig.js",
-  ".seqmig.cjs"
-];
 function loadSeqmigConfig() {
-  const cwd = process.cwd();
-  for (const fileName of possibleFiles) {
-    const fullPath = path.join(cwd, fileName);
-    if (fs.existsSync(fullPath)) {
-      return parseSeqmigConfig(fullPath, cwd);
-    }
+  const rcPath = path.join(process.cwd(), ".seqmigrc");
+  if (!fs.existsSync(rcPath)) {
+    return {
+      configFile: "./config/config.js",
+      snapshotDir: ".seqmig/snapshots",
+      migrationDir: "src/migrations",
+      modelsPath: "src/models"
+    };
   }
-  return {};
+  const content = fs.readFileSync(rcPath, "utf8");
+  const config = JSON.parse(content);
+  return {
+    configFile: config.configFile || "./config/config.js",
+    snapshotDir: config.snapshotDir || ".seqmig/snapshots",
+    migrationDir: config.migrationDir || "src/migrations",
+    modelsPath: config.modelsPath || "src/models"
+  };
 }
 __name(loadSeqmigConfig, "loadSeqmigConfig");
-function parseSeqmigConfig(fullPath, cwd) {
-  const raw = fs.readFileSync(fullPath, "utf8").trim();
-  if (!raw) return {};
-  if (fullPath.endsWith(".js") || fullPath.endsWith(".cjs")) {
-    const mod = __require(fullPath);
-    return mod.default || mod;
+function loadSequelizeConfig() {
+  const seqmigConfig = loadSeqmigConfig();
+  const configPath = path.isAbsolute(seqmigConfig.configFile) ? seqmigConfig.configFile : path.join(process.cwd(), seqmigConfig.configFile);
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`Sequelize config file not found: ${configPath}`);
   }
-  if (fullPath.endsWith(".yaml") || fullPath.endsWith(".yml")) {
-    return YAML.parse(raw);
+  delete __require.cache[__require.resolve(configPath)];
+  const config = __require(configPath);
+  const env = process.env.NODE_ENV || "development";
+  const dbConfig = config[env] || config;
+  if (!dbConfig.username) {
+    throw new Error(`Missing 'username' in Sequelize config for environment: ${env}`);
   }
-  const isExtensionless = fullPath === path.join(cwd, ".seqmig");
-  if (isExtensionless || fullPath.endsWith(".json")) {
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      console.error(`\u274C Failed to parse JSON from: ${fullPath}`);
-      throw err;
-    }
+  if (!dbConfig.password) {
+    throw new Error(`Missing 'password' in Sequelize config for environment: ${env}`);
   }
-  return {};
+  if (!dbConfig.database) {
+    throw new Error(`Missing 'database' in Sequelize config for environment: ${env}`);
+  }
+  if (!dbConfig.host) {
+    throw new Error(`Missing 'host' in Sequelize config for environment: ${env}`);
+  }
+  return {
+    username: String(dbConfig.username),
+    password: String(dbConfig.password),
+    database: String(dbConfig.database),
+    host: String(dbConfig.host),
+    port: Number(dbConfig.port || 5432),
+    dialect: "postgres",
+    logging: false
+  };
 }
-__name(parseSeqmigConfig, "parseSeqmigConfig");
-
-// src/utils/load-config.ts
-async function loadUserSequelizeConfig(customPath) {
-  const seqmig = loadSeqmigConfig();
-  const file = customPath || seqmig.config;
-  if (!file) {
-    throw new Error("\u274C No 'config' entry found in .seqmig file");
+__name(loadSequelizeConfig, "loadSequelizeConfig");
+function initConfig() {
+  const rcPath = path.join(process.cwd(), ".seqmigrc");
+  if (fs.existsSync(rcPath)) {
+    console.log(".seqmigrc already exists");
+    return;
   }
-  const fullPath = path2.resolve(process.cwd(), file);
-  if (!fs2.existsSync(fullPath)) {
-    throw new Error(`\u274C Config file does not exist: ${fullPath}`);
-  }
-  if (/\.(ts|mts|cts)$/.test(fullPath)) {
-    const result = spawnSync("npx", [
-      "tsx",
-      fullPath
-    ], {
-      cwd: process.cwd(),
-      encoding: "utf-8"
-    });
-    if (result.stderr && result.stderr.trim().length > 0) {
-      throw new Error(`\u274C Failed to load TS config:
-${result.stderr}`);
-    }
-    const stdout = result.stdout.trim();
-    if (!stdout) {
-      throw new Error(`\u274C TS config printed no JSON. Add:
-console.log(JSON.stringify(config));`);
-    }
-    let raw;
-    try {
-      raw = JSON.parse(stdout);
-    } catch (e) {
-      console.error("\u274C Raw TSX output:", stdout);
-      throw new Error(`\u274C Invalid JSON output from TS config: ${e}`);
-    }
-    return selectEnvConfig(raw, seqmig);
-  }
-  if (fullPath.endsWith(".js") || fullPath.endsWith(".cjs")) {
-    const mod = __require(fullPath);
-    const raw = normalizeModule(mod);
-    return selectEnvConfig(raw, seqmig);
-  }
-  if (fullPath.endsWith(".json")) {
-    const raw = JSON.parse(fs2.readFileSync(fullPath, "utf8"));
-    return selectEnvConfig(raw, seqmig);
-  }
-  throw new Error(`\u274C Unsupported config format: ${fullPath}`);
+  const template = {
+    configFile: "./config/config.js",
+    snapshotDir: ".seqmig/snapshots",
+    migrationDir: "src/migrations",
+    modelsPath: "src/models"
+  };
+  fs.writeFileSync(rcPath, JSON.stringify(template, null, 2));
+  console.log("Created .seqmigrc");
 }
-__name(loadUserSequelizeConfig, "loadUserSequelizeConfig");
-function normalizeModule(mod) {
-  if (!mod) return {};
-  if (mod.default) return mod.default;
-  return mod;
-}
-__name(normalizeModule, "normalizeModule");
-function selectEnvConfig(rawConfig, seqmig) {
-  const env = seqmig.env || "development";
-  if (rawConfig[env]) {
-    return rawConfig[env];
-  }
-  return rawConfig;
-}
-__name(selectEnvConfig, "selectEnvConfig");
+__name(initConfig, "initConfig");
 
 // src/services/introspect.ts
+import "reflect-metadata";
+import fs2 from "fs";
+import path2 from "path";
+import { Sequelize } from "sequelize-typescript";
+function registerRuntime() {
+  try {
+    __require("tsx/esm");
+  } catch (e) {
+    console.warn("tsx not found. Only JS will load.");
+  }
+}
+__name(registerRuntime, "registerRuntime");
 function toScalar(db) {
   const t = db.toUpperCase();
   if (t.includes("ARRAY")) return "ARRAY";
@@ -172,18 +139,54 @@ function isManyToManyJoinTable(tableName, columns, foreignKeys, indexes) {
   return hasCompositeUnique;
 }
 __name(isManyToManyJoinTable, "isManyToManyJoinTable");
-async function introspect(configPath) {
-  const cfg = await loadUserSequelizeConfig();
+function getAllModelFiles(dir) {
+  const files = [];
+  if (!fs2.existsSync(dir)) {
+    throw new Error(`Models directory not found: ${dir}`);
+  }
+  const items = fs2.readdirSync(dir);
+  for (const item of items) {
+    const fullPath = path2.join(dir, item);
+    const stat = fs2.statSync(fullPath);
+    if (stat.isDirectory()) {
+      files.push(...getAllModelFiles(fullPath));
+    } else if ((item.endsWith(".ts") || item.endsWith(".js")) && !item.endsWith(".d.ts") && item !== "index.ts" && item !== "index.js") {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+__name(getAllModelFiles, "getAllModelFiles");
+async function introspect() {
+  registerRuntime();
+  const cfg = loadSequelizeConfig();
+  const seqmigConfig = loadSeqmigConfig();
   const sequelize = new Sequelize({
     ...cfg,
     logging: false
   });
+  sequelize.import = (filePath) => {
+    if (!filePath.endsWith(".ts") && !filePath.endsWith(".js")) {
+      if (fs2.existsSync(filePath + ".ts")) filePath = filePath + ".ts";
+      if (fs2.existsSync(filePath + ".js")) filePath = filePath + ".js";
+    }
+    return import(filePath);
+  };
+  const modelsPath = path2.isAbsolute(seqmigConfig.modelsPath) ? seqmigConfig.modelsPath : path2.join(process.cwd(), seqmigConfig.modelsPath);
+  const modelFiles = getAllModelFiles(modelsPath);
+  const modelClasses = [];
+  for (const file of modelFiles) {
+    const mod = await import(file);
+    const modelClass = mod.default || Object.values(mod)[0];
+    modelClasses.push(modelClass);
+  }
+  sequelize.addModels(modelClasses);
   await sequelize.authenticate();
   const schema = {
     tables: []
   };
-  const models = sequelize.modelManager.models;
-  for (const m of models) {
+  const models = sequelize.models;
+  for (const [modelName, m] of Object.entries(models)) {
     const tableName = String(m.getTableName());
     const attrs = m.getAttributes();
     const columns = Object.entries(attrs).map(([name, a]) => {
@@ -1098,23 +1101,6 @@ async function validateSnapshot() {
 }
 __name(validateSnapshot, "validateSnapshot");
 
-// src/debug.ts
-function debugConfig() {
-  const seqmig = loadSeqmigConfig();
-  console.log("\u{1F4CC} Loaded .seqmig config:", seqmig);
-  if (seqmig.config) {
-    try {
-      const db = __require(process.cwd() + "/" + seqmig.config);
-      console.log("\u{1F4CC} Loaded DB config:", db);
-    } catch (e) {
-      console.log("\u274C Failed to load DB config:", e);
-    }
-  } else {
-    console.log("\u274C No config found in .seqmig");
-  }
-}
-__name(debugConfig, "debugConfig");
-
 // src/index.ts
 function wrap(fn) {
   return async (...args) => {
@@ -1130,6 +1116,9 @@ __name(wrap, "wrap");
 async function runCli() {
   const program = new Command();
   program.name("seqmig").description("Sequelize auto-migration CLI").version(version);
+  program.command("init").description("Initialize .seqmigrc configuration file").action(() => {
+    initConfig();
+  });
   program.command("preview").description("Preview schema diff").action(wrap(preview));
   program.command("generate").description("Generate migration file").action(wrap(generateMigration));
   program.command("run").description("Run pending migrations").action(wrap(runMigrations));
@@ -1148,9 +1137,9 @@ async function runCli() {
   program.command("restore <backup>").description("Restore snapshot").action((backup) => {
     restoreBackup(backup);
   });
-  program.command("introspect").description("Introspect DB schema").option("-c, --config <path>", "Path to sequelize config file").action(wrap(async (opts) => {
-    const result = await introspect(opts.config);
-    console.log(result);
+  program.command("introspect").description("Introspect DB schema").action(wrap(async () => {
+    const result = await introspect();
+    console.log(JSON.stringify(result, null, 2));
   }));
   await program.parseAsync(process.argv);
 }
@@ -1159,7 +1148,6 @@ if (__require.main === module) {
   runCli();
 }
 export {
-  debugConfig,
   runCli
 };
 //# sourceMappingURL=index.mjs.map

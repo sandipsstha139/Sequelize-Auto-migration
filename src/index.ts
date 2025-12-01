@@ -2,6 +2,8 @@
 
 import { Command } from "commander";
 import { version } from "../package.json";
+
+import { initConfig } from "./loaders/config-loader";
 import { introspect } from "./services/introspect";
 import {
   generateMigration,
@@ -31,6 +33,13 @@ export async function runCli() {
     .name("seqmig")
     .description("Sequelize auto-migration CLI")
     .version(version);
+
+  program
+    .command("init")
+    .description("Initialize .seqmigrc configuration file")
+    .action(() => {
+      initConfig();
+    });
 
   program
     .command("preview")
@@ -85,11 +94,10 @@ export async function runCli() {
   program
     .command("introspect")
     .description("Introspect DB schema")
-    .option("-c, --config <path>", "Path to sequelize config file")
     .action(
-      wrap(async (opts) => {
-        const result = await introspect(opts.config);
-        console.log(result);
+      wrap(async () => {
+        const result = await introspect();
+        console.log(JSON.stringify(result, null, 2));
       })
     );
 
@@ -99,5 +107,3 @@ export async function runCli() {
 if (require.main === module) {
   runCli();
 }
-
-export { debugConfig } from "./debug";

@@ -12,4 +12,5 @@ export default defineConfig({
   minify: false,
   treeshake: false,
   outDir: "dist",
+  external: ["ts-node"],
 });

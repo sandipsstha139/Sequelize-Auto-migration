@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { loadSeqmigConfig } from "../utils/load-seqmig";
+import { loadSeqmigConfig } from "src/loaders/config-loader";
 import { DatabaseSchema } from "./schema-types";
 
 export function getSnapshotPaths() {

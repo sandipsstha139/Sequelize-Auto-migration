@@ -2,41 +2,55 @@ import fs from "fs";
 import path from "path";
 
 export interface SeqmigConfig {
-  configFile?: string;
-  snapshotDir?: string;
-  migrationDir?: string;
-  modelsPath?: string;
+  configFile: string;
+  modelsPath: string;
+  migrationDir: string;
+  seedersPath: string;
+  snapshotDir: string;
+  url?: string;
+  debug?: boolean;
+  tsconfigPath?: string;
 }
 
 export function loadSeqmigConfig(): SeqmigConfig {
-  const rcPath = path.join(process.cwd(), ".seqmigrc");
+  const rcPath = path.join(process.cwd(), ".sequelizerc");
 
-  if (!fs.existsSync(rcPath)) {
-    return {
-      configFile: "./config/config.js",
-      snapshotDir: ".seqmig/snapshots",
-      migrationDir: "src/migrations",
-      modelsPath: "src/models",
-    };
+  let rc: any = {};
+  if (fs.existsSync(rcPath)) {
+    rc = require(rcPath) ?? {};
   }
 
-  const content = fs.readFileSync(rcPath, "utf8");
-  const config = JSON.parse(content);
+  const resolve = (p: string | undefined, fallback: string) =>
+    !p
+      ? path.resolve(fallback)
+      : path.isAbsolute(p)
+      ? p
+      : path.resolve(process.cwd(), p);
 
   return {
-    configFile: config.configFile || "./config/config.js",
-    snapshotDir: config.snapshotDir || ".seqmig/snapshots",
-    migrationDir: config.migrationDir || "src/migrations",
-    modelsPath: config.modelsPath || "src/models",
+    configFile: resolve(rc.config, "config/config.js"),
+    modelsPath: resolve(rc["models-path"], "models"),
+    migrationDir: resolve(rc["migrations-path"], "migrations"),
+    seedersPath: resolve(rc["seeders-path"], "seeders"),
+    snapshotDir: path.resolve(".seqmig/snapshots"),
+    url: rc.url,
+    debug: rc.debug,
+    tsconfigPath: rc["tsconfig-path"],
   };
 }
 
 export function loadSequelizeConfig(): any {
-  const seqmigConfig = loadSeqmigConfig();
+  const cfg = loadSeqmigConfig();
 
-  const configPath = path.isAbsolute(seqmigConfig.configFile!)
-    ? seqmigConfig.configFile!
-    : path.join(process.cwd(), seqmigConfig.configFile!);
+  if (cfg.url) {
+    return {
+      url: cfg.url,
+      dialect: "postgres",
+      logging: false,
+    };
+  }
+
+  const configPath = cfg.configFile;
 
   if (!fs.existsSync(configPath)) {
     throw new Error(`Sequelize config file not found: ${configPath}`);
@@ -44,57 +58,44 @@ export function loadSequelizeConfig(): any {
 
   delete require.cache[require.resolve(configPath)];
   const config = require(configPath);
+
   const env = process.env.NODE_ENV || "development";
+  const db = config[env] || config;
 
-  const dbConfig = config[env] || config;
-
-  if (!dbConfig.username) {
-    throw new Error(
-      `Missing 'username' in Sequelize config for environment: ${env}`
-    );
-  }
-  if (!dbConfig.password) {
-    throw new Error(
-      `Missing 'password' in Sequelize config for environment: ${env}`
-    );
-  }
-  if (!dbConfig.database) {
-    throw new Error(
-      `Missing 'database' in Sequelize config for environment: ${env}`
-    );
-  }
-  if (!dbConfig.host) {
-    throw new Error(
-      `Missing 'host' in Sequelize config for environment: ${env}`
-    );
-  }
+  if (!db.username) throw new Error(`Missing username in Sequelize config`);
+  if (!db.database) throw new Error(`Missing database in Sequelize config`);
+  if (!db.host) throw new Error(`Missing host in Sequelize config`);
 
   return {
-    username: String(dbConfig.username),
-    password: String(dbConfig.password),
-    database: String(dbConfig.database),
-    host: String(dbConfig.host),
-    port: Number(dbConfig.port || 5432),
-    dialect: "postgres",
+    username: String(db.username),
+    password: db.password ? String(db.password) : "",
+    database: String(db.database),
+    host: String(db.host),
+    port: Number(db.port || 5432),
+    dialect: db.dialect || "postgres",
     logging: false,
   };
 }
 
 export function initConfig() {
-  const rcPath = path.join(process.cwd(), ".seqmigrc");
+  const rcPath = path.join(process.cwd(), ".sequelizerc");
 
   if (fs.existsSync(rcPath)) {
-    console.log(".seqmigrc already exists");
+    console.log(".sequelizerc already exists");
     return;
   }
 
-  const template = {
-    configFile: "./config/config.js",
-    snapshotDir: ".seqmig/snapshots",
-    migrationDir: "src/migrations",
-    modelsPath: "src/models",
-  };
+  const template = `
+const path = require("path");
 
-  fs.writeFileSync(rcPath, JSON.stringify(template, null, 2));
-  console.log("Created .seqmigrc");
+module.exports = {
+  config: path.resolve("config/config.js"),
+  "models-path": path.resolve("models"),
+  "migrations-path": path.resolve("migrations"),
+  "seeders-path": path.resolve("seeders")
+};
+`.trimStart();
+
+  fs.writeFileSync(rcPath, template);
+  console.log("Created .sequelizerc");
 }

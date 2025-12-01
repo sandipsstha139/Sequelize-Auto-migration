@@ -18,72 +18,73 @@ var version = "1.0.0";
 import fs from "fs";
 import path from "path";
 function loadSeqmigConfig() {
-  const rcPath = path.join(process.cwd(), ".seqmigrc");
-  if (!fs.existsSync(rcPath)) {
-    return {
-      configFile: "./config/config.js",
-      snapshotDir: ".seqmig/snapshots",
-      migrationDir: "src/migrations",
-      modelsPath: "src/models"
-    };
+  const rcPath = path.join(process.cwd(), ".sequelizerc");
+  let rc = {};
+  if (fs.existsSync(rcPath)) {
+    rc = __require(rcPath) ?? {};
   }
-  const content = fs.readFileSync(rcPath, "utf8");
-  const config = JSON.parse(content);
+  const resolve = /* @__PURE__ */ __name((p, fallback) => !p ? path.resolve(fallback) : path.isAbsolute(p) ? p : path.resolve(process.cwd(), p), "resolve");
   return {
-    configFile: config.configFile || "./config/config.js",
-    snapshotDir: config.snapshotDir || ".seqmig/snapshots",
-    migrationDir: config.migrationDir || "src/migrations",
-    modelsPath: config.modelsPath || "src/models"
+    configFile: resolve(rc.config, "config/config.js"),
+    modelsPath: resolve(rc["models-path"], "models"),
+    migrationDir: resolve(rc["migrations-path"], "migrations"),
+    seedersPath: resolve(rc["seeders-path"], "seeders"),
+    snapshotDir: path.resolve(".seqmig/snapshots"),
+    url: rc.url,
+    debug: rc.debug,
+    tsconfigPath: rc["tsconfig-path"]
   };
 }
 __name(loadSeqmigConfig, "loadSeqmigConfig");
 function loadSequelizeConfig() {
-  const seqmigConfig = loadSeqmigConfig();
-  const configPath = path.isAbsolute(seqmigConfig.configFile) ? seqmigConfig.configFile : path.join(process.cwd(), seqmigConfig.configFile);
+  const cfg = loadSeqmigConfig();
+  if (cfg.url) {
+    return {
+      url: cfg.url,
+      dialect: "postgres",
+      logging: false
+    };
+  }
+  const configPath = cfg.configFile;
   if (!fs.existsSync(configPath)) {
     throw new Error(`Sequelize config file not found: ${configPath}`);
   }
   delete __require.cache[__require.resolve(configPath)];
   const config = __require(configPath);
   const env = process.env.NODE_ENV || "development";
-  const dbConfig = config[env] || config;
-  if (!dbConfig.username) {
-    throw new Error(`Missing 'username' in Sequelize config for environment: ${env}`);
-  }
-  if (!dbConfig.password) {
-    throw new Error(`Missing 'password' in Sequelize config for environment: ${env}`);
-  }
-  if (!dbConfig.database) {
-    throw new Error(`Missing 'database' in Sequelize config for environment: ${env}`);
-  }
-  if (!dbConfig.host) {
-    throw new Error(`Missing 'host' in Sequelize config for environment: ${env}`);
-  }
+  const db = config[env] || config;
+  if (!db.username) throw new Error(`Missing username in Sequelize config`);
+  if (!db.database) throw new Error(`Missing database in Sequelize config`);
+  if (!db.host) throw new Error(`Missing host in Sequelize config`);
   return {
-    username: String(dbConfig.username),
-    password: String(dbConfig.password),
-    database: String(dbConfig.database),
-    host: String(dbConfig.host),
-    port: Number(dbConfig.port || 5432),
-    dialect: "postgres",
+    username: String(db.username),
+    password: db.password ? String(db.password) : "",
+    database: String(db.database),
+    host: String(db.host),
+    port: Number(db.port || 5432),
+    dialect: db.dialect || "postgres",
     logging: false
   };
 }
 __name(loadSequelizeConfig, "loadSequelizeConfig");
 function initConfig() {
-  const rcPath = path.join(process.cwd(), ".seqmigrc");
+  const rcPath = path.join(process.cwd(), ".sequelizerc");
   if (fs.existsSync(rcPath)) {
-    console.log(".seqmigrc already exists");
+    console.log(".sequelizerc already exists");
     return;
   }
-  const template = {
-    configFile: "./config/config.js",
-    snapshotDir: ".seqmig/snapshots",
-    migrationDir: "src/migrations",
-    modelsPath: "src/models"
-  };
-  fs.writeFileSync(rcPath, JSON.stringify(template, null, 2));
-  console.log("Created .seqmigrc");
+  const template = `
+const path = require("path");
+
+module.exports = {
+  config: path.resolve("config/config.js"),
+  "models-path": path.resolve("models"),
+  "migrations-path": path.resolve("migrations"),
+  "seeders-path": path.resolve("seeders")
+};
+`.trimStart();
+  fs.writeFileSync(rcPath, template);
+  console.log("Created .sequelizerc");
 }
 __name(initConfig, "initConfig");
 
@@ -408,8 +409,6 @@ __name(introspect, "introspect");
 
 // src/services/migrate.ts
 import { execa } from "execa";
-import fs5 from "fs";
-import path5 from "path";
 
 // src/services/diff.ts
 function same(a, b) {
@@ -1021,13 +1020,6 @@ function restoreBackup(backupFile) {
 __name(restoreBackup, "restoreBackup");
 
 // src/services/migrate.ts
-function hasSequelizeCli() {
-  const cwd = process.cwd();
-  const cliPath1 = path5.join(cwd, "node_modules/.bin/sequelize");
-  const cliPath2 = path5.join(cwd, "node_modules/.bin/sequelize-cli");
-  return fs5.existsSync(cliPath1) || fs5.existsSync(cliPath2);
-}
-__name(hasSequelizeCli, "hasSequelizeCli");
 async function preview() {
   const before = loadSnapshot();
   const after = await introspect();
@@ -1049,13 +1041,7 @@ async function generateMigration() {
 }
 __name(generateMigration, "generateMigration");
 async function runMigrations() {
-  if (!hasSequelizeCli()) {
-    console.log("\u274C sequelize-cli not found in this project.");
-    console.log("Install it with:");
-    console.log("  pnpm add -D sequelize-cli");
-    return;
-  }
-  console.log("\u25B6 Running migrations via sequelize-cli...\n");
+  console.log("Running migrations via sequelize-cli...\n");
   await execa("npx", [
     "sequelize-cli",
     "db:migrate"
@@ -1065,13 +1051,7 @@ async function runMigrations() {
 }
 __name(runMigrations, "runMigrations");
 async function rollbackLast() {
-  if (!hasSequelizeCli()) {
-    console.log("\u274C sequelize-cli not found in this project.");
-    console.log("Install it with:");
-    console.log("  pnpm add -D sequelize-cli");
-    return;
-  }
-  console.log("\u25B6 Rolling back last migration via sequelize-cli...\n");
+  console.log("Rolling back last migration via sequelize-cli...\n");
   await execa("npx", [
     "sequelize-cli",
     "db:migrate:undo"
@@ -1081,11 +1061,11 @@ async function rollbackLast() {
 }
 __name(rollbackLast, "rollbackLast");
 async function rebuildSnapshot() {
-  console.log("\u26A0\uFE0F Rebuilding snapshot in 3 seconds...");
+  console.log("Rebuilding snapshot in 3 seconds...");
   await new Promise((r) => setTimeout(r, 3e3));
   const db = await introspect();
   saveSnapshot(db);
-  console.log("\u2713 Snapshot rebuilt.");
+  console.log("Snapshot rebuilt.");
 }
 __name(rebuildSnapshot, "rebuildSnapshot");
 async function validateSnapshot() {
@@ -1093,10 +1073,10 @@ async function validateSnapshot() {
   const actual = await introspect();
   const actions = diff(snapshot, actual);
   if (actions.length === 0) {
-    console.log("\u2713 Snapshot is in sync with database.");
+    console.log("Snapshot is in sync with database.");
     return;
   }
-  console.log("\u26A0\uFE0F Snapshot is OUT OF SYNC:");
+  console.log("Snapshot is OUT OF SYNC:");
   console.log(JSON.stringify(actions, null, 2));
 }
 __name(validateSnapshot, "validateSnapshot");

@@ -25,6 +25,7 @@
   "dependencies": {
     "commander": "^14.0.2",
     "execa": "^9.6.1",
+    "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "sequelize": "^6.37.7",
     "sequelize-cli": "^6.6.3",
